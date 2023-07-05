@@ -10,32 +10,18 @@
 
 
     <TextView
-        android:id="@+id/result"
+        android:id="@+id/arr_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall" />
 
-    <EditText
-        android:id="@+id/num1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:inputType="number"
-        android:layout_marginTop="20dp"
-        android:hint="Enter number 1" />
 
-    <EditText
-        android:id="@+id/num2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:inputType="number"
-        android:hint="Enter number 2" />
-
-    <Button
-        android:id="@+id/btn"
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/result"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:text="Add" />
+        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall" />
+
 
 </LinearLayout>
