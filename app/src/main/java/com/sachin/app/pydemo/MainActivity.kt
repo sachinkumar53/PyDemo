@@ -8,11 +8,15 @@ import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.CancellationException
@@ -21,6 +25,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 
 class MainActivity : AppCompatActivity() {
@@ -32,18 +38,31 @@ class MainActivity : AppCompatActivity() {
 
     private var uri: Uri? = null
 
+    private val cropImage = registerForActivityResult(CropImageContract()) { cropResult ->
+        showProgress(false)
+        if (cropResult.isSuccessful) {
+            val uriContent = cropResult.uriContent
+            iv.setImageURI(uriContent)
+        } else {
+            val exception = cropResult.error
+            result.text = exception.toString()
+        }
+    }
+
     private val launcher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { isSuccess ->
         val u = uri
         if (isSuccess && u != null) {
             lifecycleScope.launch {
-                mainView.isVisible = false
-                progress.isVisible = true
+                showProgress(true)
                 contentResolver.openInputStream(u)?.use {
                     val image = BitmapFactory.decodeStream(it)
-                    resizeGray(image)
+                    val gray = resizeGray(image)
+                    saveBitmap(gray)
+                    startCrop()
                 }
+                showProgress(false)
             }
         }
     }
@@ -63,19 +82,33 @@ class MainActivity : AppCompatActivity() {
         btn = findViewById(R.id.btn)
 
         btn.setOnClickListener {
-            val file = File(externalCacheDir, "IMG_" + System.currentTimeMillis() + ".jpg")
-            uri = FileProvider.getUriForFile(
-                this,
-                applicationContext.packageName + ".provider",
-                file
-            )
+            uri = getTempImageUri()
             launcher.launch(uri)
         }
 
     }
 
-    private suspend fun resizeGray(bitmap: Bitmap?) = withContext(Dispatchers.IO) {
-        if (bitmap == null) return@withContext
+    private fun showProgress(show: Boolean) {
+        runOnUiThread {
+            progress.isVisible = show
+            mainView.isVisible = !show
+        }
+    }
+
+    private fun getTempImageFile(): File {
+        return File(externalCacheDir, "temp.jpg")
+    }
+
+    private fun getTempImageUri(): Uri? {
+        return FileProvider.getUriForFile(
+            this,
+            applicationContext.packageName + ".provider",
+            getTempImageFile()
+        )
+    }
+
+    private suspend fun resizeGray(bitmap: Bitmap?): Bitmap? = withContext(Dispatchers.IO) {
+        if (bitmap == null) return@withContext null
         try {
             val py = Python.getInstance()
             val module = py.getModule("demo")
@@ -83,18 +116,38 @@ class MainActivity : AppCompatActivity() {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
             val i =
                 module.callAttr("resize_gray", baos.toByteArray()).toJava(ByteArray::class.java)
-            val bitmap = BitmapFactory.decodeByteArray(i, 0, i.size)
-            runOnUiThread {
+            BitmapFactory.decodeByteArray(i, 0, i.size)
+            /*runOnUiThread {
                 progress.isVisible = false
                 mainView.isVisible = true
                 iv.setImageBitmap(bitmap)
-            }
+            }*/
         } catch (e: Exception) {
             e.printStackTrace()
             if (e is CancellationException) throw e
-            runOnUiThread {
-                result.text = e.toString()
-            }
+            null
+        }
+    }
+
+    private fun startCrop() {
+        cropImage.launch(
+            CropImageContractOptions(
+                uri = uri,
+                cropImageOptions = CropImageOptions()
+            )
+        )
+    }
+
+    private suspend fun saveBitmap(bitmap: Bitmap?) = withContext(Dispatchers.IO) {
+        if (bitmap == null) return@withContext
+        try {
+            val fos = FileOutputStream(getTempImageFile())
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+            fos.flush()
+            fos.close()
+        } catch (e: IOException) {
+            e.printStackTrace()
+            Toast.makeText(this@MainActivity, e.message ?: "", Toast.LENGTH_SHORT).show()
         }
     }
 }
