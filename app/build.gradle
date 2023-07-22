@@ -25,6 +25,11 @@ android {
             pip {
                 install "numpy"
                 install "opencv-python"
+                install "ocrd-fork-pylsd==0.0.3"
+                install "pylsd==0.0.2"
+                install "pylsd-nova==1.2.1"
+                install "scikit-image"
+                install "scipy"
             }
         }
     }
